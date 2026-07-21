@@ -241,6 +241,7 @@ main{max-width:1400px;margin:0 auto;padding:1.25rem 1rem;}
  <div id="bff"         class="tab-pane"></div>
  <div id="courses"     class="tab-pane"></div>
  <div id="montecarlo"  class="tab-pane"></div>
+ <div id="qualwatch"   class="tab-pane"></div>
  <div id="playoffs"    class="tab-pane"></div>
  <div id="champions"   class="tab-pane"></div>
  <div id="contacts"    class="tab-pane"></div>
@@ -306,7 +307,7 @@ document.addEventListener('click', function(e) {
 });
 function renderTab(id) {
   ({standings:rStandings, recap:rRecap, weekly:rWeekly, players:rPlayers,
-    partners:rPartners, bff:rBFF, courses:rCourses, montecarlo:rMC, playoffs:rPlayoffs, champions:rChampions,
+    partners:rPartners, bff:rBFF, courses:rCourses, montecarlo:rMC, qualwatch:rQualWatch, playoffs:rPlayoffs, champions:rChampions,
     contacts:rContacts, email:rEmail, xlexport:rExport})[id]?.();
 }
 
@@ -349,7 +350,7 @@ function rStandings() {
       <td>${s.rounds}</td><td>${fmt(s.avg)}</td>
       <td class="${opCls}">${sign(s.avgOverPar)}</td>
       <td class="g">${s.best||'—'}</td><td class="r">${s.worst||'—'}</td>
-      <td>${s.uniquePartners}</td><td class="hc">${fmt(s.playoffHC)}</td>
+      <td>${s.qualifiedPartners}<span class="mu">/${s.uniquePartners}</span></td><td class="hc">${fmt(s.playoffHC)}</td>
       <td>${badge}</td></tr>`;
   });
   el.innerHTML = statCards([
@@ -360,10 +361,49 @@ function rStandings() {
     [last.course||'—','Last Course'],
     [dfmt(last.date,{month:'short',day:'numeric'}),'Last Played'],
   ])+`<div class="card"><div class="card-title">Season Standings</div>
+  <div class="card-sub">Partners column shows qualifying partners / total unique partners — only qualifying partners (10+ rounds, or a defending champion) earn a bonus stroke.</div>
   <div class="tbl-wrap"><table class="dtbl">
     <thead><tr><th>Rank</th><th>Player</th><th>Rds</th><th>Avg</th><th>Avg +/-</th>
     <th>Best</th><th>Worst</th><th>Partners</th><th>HC</th><th>Status</th></tr></thead>
     <tbody>${rows}</tbody></table></div></div>`;
+}
+
+// ===== QUALIFICATION WATCH =====
+function rQualWatch() {
+  const el = document.getElementById('qualwatch');
+  const qw = D.qualificationWatch;
+  if (!qw) { el.innerHTML = ''; return; }
+  const endLabel = dfmt(qw.seasonEndDate,{month:'short',day:'numeric'});
+  const cards = statCards([
+    [qw.remainingWeeks,'Weeks Left to Qualify'],
+    [endLabel,'Last Qualifying Week'],
+    [qw.qualifiedCount,'Already Qualified','g'],
+    [qw.stillAlive.length,'Still Alive'],
+    [qw.eliminated.length,'Eliminated','r'],
+  ]);
+  const aliveRows = qw.stillAlive.map(s=>{
+    const slackCls = s.slack<=1?'r':s.slack<=3?'gd':'g';
+    return `<tr><td class="pl">${esc(s.player)}</td><td>${s.rounds}</td>
+      <td>${s.roundsShort} of ${qw.remainingWeeks}</td>
+      <td class="${slackCls}">${s.slack}</td>
+      <td class="hc">${fmt(s.playoffHC)}</td></tr>`;
+  }).join('');
+  const elimRows = qw.eliminated.map(s=>
+    `<tr><td class="pl">${esc(s.player)}</td><td>${s.rounds}</td><td>${s.maxPossible}</td></tr>`
+  ).join('');
+  el.innerHTML = cards + `
+    <div class="card"><div class="card-title">🎯 Still Alive — Sorted by Tightest Margin</div>
+    <div class="card-sub">Needs to play in most of the remaining ${qw.remainingWeeks} week${qw.remainingWeeks===1?'':'s'} (by ${endLabel}) to reach ${D.roundsNeeded} rounds and qualify. "Cushion" is how many of those weeks they can skip and still make it.</div>
+    <div class="tbl-wrap"><table class="dtbl">
+      <thead><tr><th>Player</th><th>Rounds</th><th>Rounds Needed</th><th>Cushion</th><th>HC</th></tr></thead>
+      <tbody>${aliveRows || '<tr><td colspan="5" class="mu">Nobody in this bucket right now.</td></tr>'}</tbody>
+    </table></div></div>
+    ${qw.eliminated.length ? `<div class="card"><div class="card-title">🚫 Mathematically Eliminated</div>
+    <div class="card-sub">Can no longer reach ${D.roundsNeeded} rounds even by playing every remaining week — no bonus stroke is earned by their partners for rounds played with them.</div>
+    <div class="tbl-wrap"><table class="dtbl">
+      <thead><tr><th>Player</th><th>Rounds Played</th><th>Max Possible</th></tr></thead>
+      <tbody>${elimRows}</tbody>
+    </table></div></div>` : ''}`;
 }
 
 // ===== RECAP =====
@@ -1989,6 +2029,7 @@ rStandings(); seen.add('standings');
  <button onclick="showMore('partners')">🤝 Partners</button>
  <button onclick="showMore('bff')">💚 BFF</button>
  <button onclick="showMore('montecarlo')">🎲 Playoff Odds</button>
+ <button onclick="showMore('qualwatch')">🎯 Qualify Watch</button>
  <button onclick="showMore('playoffs')">🏆 Playoffs</button>
  <button onclick="showMore('champions')">🏅 Champions</button>
  <button onclick="showMore('contacts')">📋 Contacts</button>
