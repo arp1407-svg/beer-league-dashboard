@@ -242,6 +242,7 @@ main{max-width:1400px;margin:0 auto;padding:1.25rem 1rem;}
  <div id="courses"     class="tab-pane"></div>
  <div id="montecarlo"  class="tab-pane"></div>
  <div id="qualwatch"   class="tab-pane"></div>
+ <div id="needplay"    class="tab-pane"></div>
  <div id="playoffs"    class="tab-pane"></div>
  <div id="champions"   class="tab-pane"></div>
  <div id="contacts"    class="tab-pane"></div>
@@ -307,7 +308,7 @@ document.addEventListener('click', function(e) {
 });
 function renderTab(id) {
   ({standings:rStandings, recap:rRecap, weekly:rWeekly, players:rPlayers,
-    partners:rPartners, bff:rBFF, courses:rCourses, montecarlo:rMC, qualwatch:rQualWatch, playoffs:rPlayoffs, champions:rChampions,
+    partners:rPartners, bff:rBFF, courses:rCourses, montecarlo:rMC, qualwatch:rQualWatch, needplay:rNeedPlay, playoffs:rPlayoffs, champions:rChampions,
     contacts:rContacts, email:rEmail, xlexport:rExport})[id]?.();
 }
 
@@ -404,6 +405,54 @@ function rQualWatch() {
       <thead><tr><th>Player</th><th>Rounds Played</th><th>Max Possible</th></tr></thead>
       <tbody>${elimRows}</tbody>
     </table></div></div>` : ''}`;
+}
+
+// ===== NEED TO PLAY (bonus-stroke partners not yet played this season) =====
+let selNP = null;
+function rNeedPlay() {
+  const el = document.getElementById('needplay');
+  const plist = [...D.partnerPlayers].sort();
+  selNP = selNP || plist[0];
+  const opts = plist.map(p=>`<option value="${p}"${p===selNP?' selected':''}>${p}</option>`).join('');
+  el.innerHTML = `
+    <div class="sel-row"><label>Select Player:</label>
+      <select onchange="selNPCh(this.value)">${opts}</select></div>
+    <div id="np-body"></div>`;
+  rNPBody(selNP);
+}
+function selNPCh(n){ selNP=n; rNPBody(n); }
+function rNPBody(name) {
+  const mx = D.partnerMatrix[name]||{};
+  const played = p => (mx[p]||0) > 0;
+  const qualNotPlayed = D.standings
+    .filter(s=>s.player!==name && isQual(s.player) && !played(s.player))
+    .sort((a,b)=>a.player.localeCompare(b.player));
+  const aliveNotPlayed = (D.qualificationWatch.stillAlive||[])
+    .filter(s=>s.player!==name && !played(s.player))
+    .sort((a,b)=>a.slack-b.slack);
+  const cards = statCards([
+    [qualNotPlayed.length,'Qualified — Not Yet Played','g'],
+    [aliveNotPlayed.length,'Still Alive — Not Yet Played'],
+  ]);
+  const qRows = qualNotPlayed.map(s=>
+    `<tr><td class="pl">${esc(s.player)}</td><td>${s.rounds}</td><td class="hc">${fmt(s.playoffHC)}</td></tr>`
+  ).join('') || `<tr><td colspan="3" class="mu">You've played with everyone who has already qualified. 🎉</td></tr>`;
+  const aRows = aliveNotPlayed.map(s=>{
+    const slackCls = s.slack<=1?'r':s.slack<=3?'gd':'g';
+    return `<tr><td class="pl">${esc(s.player)}</td><td>${s.rounds}</td><td>${s.roundsShort}</td>
+      <td class="${slackCls}">${s.slack}</td><td class="hc">${fmt(s.playoffHC)}</td></tr>`;
+  }).join('') || '<tr><td colspan="5" class="mu">Nobody left in this bucket to chase.</td></tr>';
+  document.getElementById('np-body').innerHTML = cards + `
+    <div class="card"><div class="card-title">✅ Already Qualified — Play These For a Guaranteed Bonus Stroke</div>
+    <div class="card-sub">These players have already reached ${D.roundsNeeded} rounds (or are defending champions). A round together locks in ${name}'s partner bonus for them.</div>
+    <div class="tbl-wrap"><table class="dtbl">
+      <thead><tr><th>Player</th><th>Rounds</th><th>HC</th></tr></thead>
+      <tbody>${qRows}</tbody></table></div></div>
+    <div class="card"><div class="card-title">🎯 Still Alive — Worth Chasing Before They Qualify</div>
+    <div class="card-sub">Not qualified yet but mathematically still can be — sorted by tightest margin first. Play with them now and the round counts toward ${name}'s bonus once they cross the line.</div>
+    <div class="tbl-wrap"><table class="dtbl">
+      <thead><tr><th>Player</th><th>Rounds</th><th>Rounds Needed</th><th>Cushion</th><th>HC</th></tr></thead>
+      <tbody>${aRows}</tbody></table></div></div>`;
 }
 
 // ===== RECAP =====
@@ -2030,6 +2079,7 @@ rStandings(); seen.add('standings');
  <button onclick="showMore('bff')">💚 BFF</button>
  <button onclick="showMore('montecarlo')">🎲 Playoff Odds</button>
  <button onclick="showMore('qualwatch')">🎯 Qualify Watch</button>
+ <button onclick="showMore('needplay')">🙋 Need To Play</button>
  <button onclick="showMore('playoffs')">🏆 Playoffs</button>
  <button onclick="showMore('champions')">🏅 Champions</button>
  <button onclick="showMore('contacts')">📋 Contacts</button>
